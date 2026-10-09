@@ -66,7 +66,10 @@ Il cuore cognitivo del sistema adotta nativamente il nuovo **[Microsoft Agent Fr
 3. **GDPR & Anti-Spam Compliance:**
    - Inclusione automatica in calce a ciascuna bozza del disclaimer di trasparenza e clausola di disiscrizione rapida ("Cancella").
    - Esclusione dei lead privi di indirizzo email aziendale generico (`info@`, `amministrazione@`, `commerciale@`).
-4. **Rate Limiting Controllato:**
+4. **Targeting Mirato - Solo Attività Senza Sito Web (`OnlyBusinessesWithoutWebsite`):**
+   - La pipeline include un filtro configurabile (`OnlyBusinessesWithoutWebsite: true`) per concentrarsi **esclusivamente** sulle attività locali che non dispongono ancora di un proprio sito web (o hanno solo una pagina social / scheda Maps).
+   - Per queste attività, l'agente effettua il discovery automatico dei contatti email pubblici (tramite pagine social o motore di ricerca) e prepara una proposta personalizzata ed empatica evidenziando il valore di una vetrina digitale proprietaria per farsi trovare dai clienti su smartphone.
+5. **Rate Limiting Controllato:**
    - 5-10 lead per sessione per preservare la reputazione dell'account e consentire la reale verifica manuale.
    - Deduplicazione automatica: le aziende già contattate negli ultimi 90 giorni vengono scartate a monte.
 

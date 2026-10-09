@@ -458,6 +458,122 @@ public class PlaywrightScraperService : IScraperService
         }
     }
 
+    /// <summary>
+    /// Tenta di rintracciare un'email pubblica per un'attività priva di sito web (ispezionando link social o ricerca web).
+    /// </summary>
+    public async Task<string?> FindPublicContactEmailAsync(
+        string businessName,
+        string city,
+        string? socialUrl,
+        CancellationToken ct = default)
+    {
+        EnsureBrowsersInstalled();
+
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        {
+            Headless = true,
+            Args = ["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"]
+        });
+
+        var context = await browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            Locale = "it-IT"
+        });
+
+        var page = await context.NewPageAsync();
+        var discoveredEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            // 1. Se è presente una pagina social (es. Facebook o Instagram), prova a leggere le info pubbliche
+            if (!string.IsNullOrWhiteSpace(socialUrl))
+            {
+                try
+                {
+                    _logger.LogInformation("Verifica pagina social pubblica per '{Business}': {Url}", businessName, socialUrl);
+                    await page.GotoAsync(socialUrl, new PageGotoOptions { Timeout = 12000, WaitUntil = WaitUntilState.DOMContentLoaded });
+                    await page.WaitForTimeoutAsync(1500);
+
+                    var socialContent = await page.ContentAsync();
+                    ExtractEmailsFromText(socialContent, discoveredEmails);
+
+                    var mailtoLinks = await page.Locator("a[href^='mailto:']").AllAsync();
+                    foreach (var mailto in mailtoLinks)
+                    {
+                        var href = await mailto.GetAttributeAsync("href");
+                        if (!string.IsNullOrWhiteSpace(href))
+                        {
+                            var clean = href.Replace("mailto:", string.Empty, StringComparison.OrdinalIgnoreCase).Split('?')[0].Trim();
+                            if (EmailRegex.IsMatch(clean))
+                            {
+                                discoveredEmails.Add(clean);
+                            }
+                        }
+                    }
+
+                    var validFromSocial = discoveredEmails.FirstOrDefault(e =>
+                        !e.EndsWith(".png", StringComparison.OrdinalIgnoreCase) &&
+                        !e.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) &&
+                        !e.Contains("facebook.com", StringComparison.OrdinalIgnoreCase) &&
+                        !e.Contains("instagram.com", StringComparison.OrdinalIgnoreCase) &&
+                        !e.Contains("sentry.io", StringComparison.OrdinalIgnoreCase));
+
+                    if (!string.IsNullOrWhiteSpace(validFromSocial))
+                    {
+                        _logger.LogInformation("Email trovata su pagina social per '{Business}': {Email}", businessName, validFromSocial);
+                        return validFromSocial;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Ispezione pagina social fallita per '{Business}'.", businessName);
+                }
+            }
+
+            // 2. Fallback: interrogazione DuckDuckGo HTML per '{businessName} {city} email'
+            try
+            {
+                var query = Uri.EscapeDataString($"{businessName} {city} email");
+                var searchUrl = $"https://html.duckduckgo.com/html/?q={query}";
+                _logger.LogDebug("Ricerca recapito pubblico su motore di ricerca per '{Business}': {Url}", businessName, searchUrl);
+
+                await page.GotoAsync(searchUrl, new PageGotoOptions { Timeout = 12000, WaitUntil = WaitUntilState.DOMContentLoaded });
+                var searchContent = await page.ContentAsync();
+
+                ExtractEmailsFromText(searchContent, discoveredEmails);
+
+                var validFromSearch = discoveredEmails.FirstOrDefault(e =>
+                    !e.EndsWith(".png", StringComparison.OrdinalIgnoreCase) &&
+                    !e.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) &&
+                    !e.Contains("duckduckgo.com", StringComparison.OrdinalIgnoreCase) &&
+                    !e.Contains("example.com", StringComparison.OrdinalIgnoreCase) &&
+                    !e.Contains("sentry.io", StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(validFromSearch))
+                {
+                    _logger.LogInformation("Email pubblica individuata tramite ricerca web per '{Business}': {Email}", businessName, validFromSearch);
+                    return validFromSearch;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Ricerca web recapito fallita per '{Business}'.", businessName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Errore generico durante ricerca recapito pubblico per '{Business}'.", businessName);
+        }
+        finally
+        {
+            await context.CloseAsync();
+        }
+
+        return null;
+    }
+
     private static async Task HandleCookieConsentAsync(IPage page)
     {
         try
@@ -475,3 +591,4 @@ public class PlaywrightScraperService : IScraperService
         }
     }
 }
+

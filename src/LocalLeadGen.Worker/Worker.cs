@@ -64,6 +64,7 @@ public class Worker : BackgroundService
                     _settings.TargetCities,
                     _settings.TargetCategories,
                     _settings.MaxDailyLeads,
+                    _settings.OnlyBusinessesWithoutWebsite,
                     stoppingToken);
 
                 _logger.LogInformation("==================================================================");

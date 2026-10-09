@@ -40,9 +40,11 @@ public class ProcessDailyLeadsWorkflow
         IReadOnlyList<string> targetCities,
         IReadOnlyList<string> targetCategories,
         int maxLeadsToProcess = 5,
+        bool onlyBusinessesWithoutWebsite = true,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Avvio workflow di Lead Generation Locale. Obiettivo: {MaxLeads} lead qualificati.", maxLeadsToProcess);
+        _logger.LogInformation("Avvio workflow di Lead Generation Locale. Obiettivo: {MaxLeads} lead qualificati. Filtro solo senza sito: {FilterNoWebsite}",
+            maxLeadsToProcess, onlyBusinessesWithoutWebsite);
 
         var processedCount = 0;
         var duplicateWindow = TimeSpan.FromDays(90);
@@ -81,6 +83,14 @@ public class ProcessDailyLeadsWorkflow
                     if (processedCount >= maxLeadsToProcess || ct.IsCancellationRequested)
                     {
                         break;
+                    }
+
+                    // Se il filtro è attivo e l'attività possiede già un sito web proprietario, la saltiamo
+                    if (onlyBusinessesWithoutWebsite && business.HasWebsiteLink)
+                    {
+                        _logger.LogInformation("Salto '{Business}': possiede già un sito web ({WebsiteUrl}).",
+                            business.BusinessName, business.WebsiteUrl);
+                        continue;
                     }
 
                     try
@@ -173,14 +183,37 @@ public class ProcessDailyLeadsWorkflow
         }
         else
         {
-            _logger.LogInformation("L'attività '{Business}' NON possiede un sito web proprietario (o ha solo social). Target ideale per proposta primo sito web!", business.BusinessName);
+            _logger.LogInformation("L'attività '{Business}' NON possiede un sito web proprietario. Ricerca recapito email pubblico...", business.BusinessName);
+
+            // Se l'attività non ha sito web e non ha email diretta da Maps, tentiamo di rintracciare recapito da canali social o ricerca pubblica
+            if (contactEmail is null)
+            {
+                try
+                {
+                    var publicEmail = await _scraperService.FindPublicContactEmailAsync(
+                        business.BusinessName,
+                        business.City,
+                        business.WebsiteUrl, // Potrebbe essere il link social registrato su Maps
+                        ct);
+
+                    if (!string.IsNullOrWhiteSpace(publicEmail) && EmailAddress.TryCreate(publicEmail, out var foundEmail))
+                    {
+                        contactEmail = foundEmail;
+                        _logger.LogInformation("Email pubblica recuperata per '{Business}': {Email}", business.BusinessName, contactEmail.Value);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Ricerca email pubblica non riuscita per '{Business}'.", business.BusinessName);
+                }
+            }
         }
 
-        // Se non abbiamo trovato un'email né su Maps né dal sito, il lead viene registrato ma scartato da outreach
+        // Se non abbiamo trovato un'email né su Maps né dal sito né da recapiti pubblici, il lead viene registrato ma scartato da outreach
         if (contactEmail is null)
         {
             _logger.LogInformation("Nessuna email aziendale rintracciata per '{Business}'. Marcato come SkippedNoContact.", business.BusinessName);
-            lead.MarkSkippedNoContact("Nessun indirizzo email aziendale estratto (scheda priva di recapito email e nessun sito).");
+            lead.MarkSkippedNoContact("Nessun indirizzo email aziendale estratto (scheda priva di recapito email e nessun canale pubblico con email).");
             await _leadRepository.UpdateAsync(lead, ct);
             await _leadRepository.SaveChangesAsync(ct);
             return false;

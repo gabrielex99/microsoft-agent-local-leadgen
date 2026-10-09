@@ -22,4 +22,13 @@ public interface IScraperService
     Task<WebsiteInspectionResult> InspectWebsiteAsync(
         string websiteUrl,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Tenta di rintracciare un'email pubblica per un'attività priva di sito web (ispezionando link social Facebook/Instagram o ricerca web).
+    /// </summary>
+    Task<string?> FindPublicContactEmailAsync(
+        string businessName,
+        string city,
+        string? socialUrl,
+        CancellationToken ct = default);
 }

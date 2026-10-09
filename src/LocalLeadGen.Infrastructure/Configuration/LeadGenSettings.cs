@@ -10,6 +10,11 @@ public sealed class LeadGenSettings
     public const string SectionName = "LeadGenSettings";
 
     /// <summary>
+    /// Se true, filtra ed elabora esclusivamente le attività che NON possiedono un sito web proprietario.
+    /// </summary>
+    public bool OnlyBusinessesWithoutWebsite { get; set; } = true;
+
+    /// <summary>
     /// Limite giornaliero di lead da qualificare e preparare come bozza (default: 5, consigliato max 10).
     /// </summary>
     [Range(1, 20, ErrorMessage = "MaxDailyLeads deve essere compreso tra 1 e 20.")]

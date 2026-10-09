@@ -1,0 +1,41 @@
+# Build and runtime outputs
+[Bb]in/
+[Oo]bj/
+logs/
+
+# SQLite databases
+*.db
+*.db-*
+**/*.db
+**/*.db-*
+**/data/*.db*
+
+# Google OAuth Credentials & Cached Tokens
+credentials.json
+**/credentials.json
+client_secret*.json
+**/client_secret*.json
+**/token/
+**/token.json
+
+# User secrets & local configurations
+appsettings.Local.json
+**/appsettings.Local.json
+.env
+**/.env
+
+# VS Code and Rider
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+Thumbs.db

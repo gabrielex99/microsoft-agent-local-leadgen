@@ -1,0 +1,29 @@
+{
+  "name": "LocalLeadGen .NET 9 DevContainer",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "mounts": [
+    "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/credentials,target=/workspace/credentials,type=bind,consistency=cached"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "alexcvzz.vscode-sqlite",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "/workspace/LocalLeadGen.sln",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "postCreateCommand": "dotnet restore /workspace/LocalLeadGen.sln && dotnet build /workspace/LocalLeadGen.sln && (dotnet tool install --global Microsoft.Playwright.CLI || true) && ~/.dotnet/tools/playwright install chromium",
+  "remoteUser": "vscode"
+}
